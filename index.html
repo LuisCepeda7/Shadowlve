@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Para Ximena</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .window-error {
+            display: none;
+            position: absolute;
+            z-index: 100;
+            background: #c0c0c0;
+            border: 2px solid;
+            border-color: #fff #000 #000 #fff;
+            width: 350px;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.8);
+            color: black;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .title-bar {
+            background: #000080;
+            color: white;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .content {
+            padding: 25px;
+            text-align: center;
+            font-size: 16px;
+        }
+        .btn {
+            margin-top: 20px;
+            padding: 5px 25px;
+            background: #c0c0c0;
+            border: 2px solid;
+            border-color: #fff #000 #000 #fff;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn:active {
+            border-color: #000 #fff #fff #000;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="bg-music" src="love_me.mp3"></audio>
+
+    <div id="error-box" class="window-error">
+        <div class="title-bar">
+            <span>Error Fatal</span>
+            <span>X</span>
+        </div>
+        <div class="content">
+            <p><strong>ERROR 404:</strong> Fallo en el sistema.</p>
+            <p style="font-size: 12px; color: #555;">Reintentando conexión...</p>
+            <button class="btn" onclick="startExperience()">Aceptar</button>
+        </div>
+    </div>
+
+    <canvas id="mainCanvas"></canvas>
+
+    <script>
+        const errorBox = document.getElementById('error-box');
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const music = document.getElementById('bg-music');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const flowerCanvas = document.createElement('canvas');
+        flowerCanvas.width = canvas.width;
+        flowerCanvas.height = canvas.height;
+        const fctx = flowerCanvas.getContext('2d');
+
+        // MÁSCARA ASCII ORGÁNICA
+        const maskCanvas = document.createElement('canvas');
+        function generateOrganicMask() {
+            maskCanvas.width = window.innerWidth;
+            maskCanvas.height = window.innerHeight;
+            const mCtx = maskCanvas.getContext('2d');
+            mCtx.fillStyle = '#fff';
+            mCtx.font = 'bold 12px monospace'; 
+            const asciiChars = ["W", "M", "@", "%", "&", "#", "=", "*", "+", ":", "-", ".", ","]; 
+            
+            for(let y = -10; y <= maskCanvas.height + 20; y += 10) {
+                let line = "";
+                for(let i=0; i < (maskCanvas.width / 5) + 50; i++) {
+                    line += asciiChars[Math.floor(Math.random() * asciiChars.length)];
+                }
+                let xOff = (y % 20 === 0) ? 0 : -5; 
+                mCtx.fillText(line, xOff, y);
+            }
+        }
+        generateOrganicMask();
+
+        const chars = ".,-~:;=!*#$@";
+
+        // --- SISTEMA DE LUCIÉRNAGAS ---
+        const fireflies = [];
+        const fireflyChars = [".", "*", "+", "`"];
+        for(let i = 0; i < 150; i++) {
+            fireflies.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                speed: 0.05 + Math.random() * 0.2, 
+                char: fireflyChars[Math.floor(Math.random() * fireflyChars.length)],
+                blinkSpeed: 0.001 + Math.random() * 0.002, 
+                phase: Math.random() * Math.PI * 2 
+            });
+        }
+
+        // --- FASE 1: CORAZÓN 3D ---
+        let heartPoints = [];
+        for(let z = -1.5; z <= 1.5; z += 0.08) {
+            for(let y = -1.5; y <= 1.5; y += 0.08) {
+                for(let x = -1.5; x <= 1.5; x += 0.08) {
+                    let x2 = x*x, y2 = y*y, z2 = z*z;
+                    let val = Math.pow(x2 + 2.25*y2 + z2 - 1, 3) - (x2*z2*z) - (0.1125*y2*z2*z);
+                    if(val <= 0.0 && val > -0.3) heartPoints.push({x, y, z});
+                }
+            }
+        }
+        heartPoints.sort(() => Math.random() - 0.5);
+
+        let A = 0;
+        let frameCount = 0;
+        let heartInterval;
+
+        function renderAsciiHeart() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let pointsToDraw = Math.floor(heartPoints.length * (frameCount / 360));
+            if (pointsToDraw > heartPoints.length) pointsToDraw = heartPoints.length;
+
+            let projected = [];
+            for (let i = 0; i < pointsToDraw; i++) {
+                let p = heartPoints[i];
+                let rotX = p.x * Math.cos(A) - p.y * Math.sin(A);
+                let rotY = p.x * Math.sin(A) + p.y * Math.cos(A);
+                let scale = 160; 
+                let screenX = canvas.width / 2 + rotX * scale;
+                let screenY = canvas.height / 2 - p.z * scale - 40; 
+                projected.push({ x: screenX, y: screenY, depth: rotY });
+            }
+
+            projected.sort((a, b) => a.depth - b.depth);
+            ctx.font = "bold 15px monospace";
+            ctx.textAlign = "center";
+
+            for (let p of projected) {
+                let norm = (p.depth + 1.5) / 3; 
+                if(norm < 0) norm = 0; if(norm > 1) norm = 1;
+                let r = Math.floor(80 + 175 * norm); 
+                ctx.fillStyle = `rgb(${r}, 0, 0)`;
+                let charIdx = Math.floor(norm * chars.length);
+                if(charIdx >= chars.length) charIdx = chars.length - 1;
+                ctx.fillText(chars[charIdx], p.x, p.y);
+            }
+
+            A += 0.03; 
+            frameCount++;
+
+            if (frameCount > 360) {
+                clearInterval(heartInterval);
+                setTimeout(() => {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    errorBox.style.display = 'block';
+                }, 500);
+            }
+        }
+        heartInterval = setInterval(renderAsciiHeart, 33);
+
+
+        // --- FASE 2: TEXTO 3D UNIFORME ---
+        let isClimax = false;
+        let particles = [];
+        let texts = []; 
+        let spawnCount = 0;
+        let startFlowers = false;
+
+        const customFontGrid = [
+            "##       ######  ##      ## ######      ###    ### ######",
+            "##      ##    ## ##      ## ##          ####  #### ##    ",
+            "##      ##    ## ##      ## ######      ## #### ## ######",
+            "##      ##    ##  ##    ##  ##          ##  ##  ## ##    ",
+            "######   ######    ######   ######      ##      ## ######"
+        ];
+
+        let loveMeTemplate = [];
+        function generateLoveMe3DUniform() {
+            let width = customFontGrid[0].length;
+            let height = customFontGrid.length;
+            for(let y = 0; y < height; y++) {
+                for(let x = 0; x < width; x++) {
+                    if(customFontGrid[y][x] === '#') {
+                        for(let z = -8; z <= 8; z += 4) {
+                            loveMeTemplate.push({ x: (x - width/2) * 12, y: (y - height/2) * 16, z: z });
+                        }
+                    }
+                }
+            }
+        }
+        generateLoveMe3DUniform();
+
+        class LoveMeVolumetric {
+            constructor(isFirst) {
+                this.isCenter = isFirst;
+                if (isFirst) {
+                    this.cx = canvas.width / 2;
+                    this.cy = canvas.height / 2;
+                    this.targetScale = 1.3; 
+                    this.spinSpeed = 0; 
+                } else {
+                    this.cx = (spawnCount % 2 === 0) ? (canvas.width * 0.2) : (canvas.width * 0.8);
+                    this.cy = canvas.height * 0.2 + (Math.random() * 200);
+                    this.targetScale = 0.65; 
+                    let direction = Math.random() > 0.5 ? 1 : -1;
+                    this.spinSpeed = direction * (0.0005 + Math.random() * 0.001); 
+                }
+                
+                this.currentScale = 0;
+                this.life = 450; 
+                this.exploded = false;
+                this.angle = 0;
+                this.points = JSON.parse(JSON.stringify(loveMeTemplate)); 
+            }
+
+            draw() {
+                if (this.exploded) return;
+                
+                if (this.currentScale < this.targetScale) {
+                    this.currentScale += 0.03;
+                    if(this.currentScale > this.targetScale) this.currentScale = this.targetScale;
+                }
+                
+                this.angle += this.spinSpeed; 
+
+                let waveActive = this.life < 140; 
+                let waveX = waveActive ? -600 + ((140 - this.life) / 140) * 1200 : -999;
+
+                let projected = [];
+                for (let p of this.points) {
+                    let rotX = p.x * Math.cos(this.angle) - p.z * Math.sin(this.angle);
+                    let rotZ = p.x * Math.sin(this.angle) + p.z * Math.cos(this.angle);
+                    
+                    projected.push({ 
+                        origX: p.x,
+                        screenX: this.cx + (rotX * this.currentScale), 
+                        screenY: this.cy + (p.y * this.currentScale), 
+                        depth: rotZ 
+                    });
+                }
+
+                projected.sort((a, b) => a.depth - b.depth);
+                ctx.font = "bold 14px monospace";
+                ctx.textAlign = "center";
+
+                for (let p of projected) {
+                    let isHighlighted = waveActive && Math.abs(p.origX - waveX) < 120; 
+
+                    if (isHighlighted) {
+                        ctx.fillStyle = '#ffffff'; 
+                        ctx.fillText("@", p.screenX, p.screenY); 
+                    } else {
+                        let norm = (p.depth + 15) / 30; 
+                        if(norm < 0) norm = 0; if(norm > 1) norm = 1;
+                        let r = Math.floor(100 + 155 * norm); 
+                        ctx.fillStyle = `rgb(${r}, 0, 30)`; 
+                        let charIdx = Math.floor(norm * chars.length);
+                        if(charIdx >= chars.length) charIdx = chars.length - 1;
+                        ctx.fillText(chars[charIdx], p.screenX, p.screenY);
+                    }
+                }
+                
+                this.life--;
+                if (this.life <= 0) this.explode(projected);
+            }
+
+            explode(projectedPoints) {
+                this.exploded = true;
+                if (this.isCenter) startFlowers = true; 
+
+                for (let i = 0; i < projectedPoints.length; i+=60) {
+                    let p = projectedPoints[i];
+                    particles.push({
+                        x: p.screenX, y: p.screenY,
+                        vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 1) * 3,
+                        char: chars[Math.floor(Math.random() * chars.length)],
+                        color: `hsl(${Math.random() * 20 + 340}, 100%, 70%)`,
+                        history: [] 
+                    });
+                }
+            }
+        }
+
+
+        // --- FASE 3: FLORES REALISTAS CON VARIACIÓN INDIVIDUAL ---
+        let globalFlowerProgress = 0; 
+        
+        const lilies = [
+            // Capa Trasera
+            { x: -350, scale: 0.6, delay: 0.9, growth: 0, bloom: 0, height: 200, colors: { center: '#001133', mid: '#0055ff', edge: '#88bbff', highlight: 'rgba(200,220,255,0.7)' }, stem: '#22aa22', leaves: [{t: 0.5, d: 1}] },
+            { x: 350, scale: 0.65, delay: 0.85, growth: 0, bloom: 0, height: 230, colors: { center: '#330033', mid: '#9900ff', edge: '#dd88ff', highlight: 'rgba(240,200,255,0.7)' }, stem: '#33cc33', leaves: [{t: 0.4, d: -1}] },
+            { x: 280, scale: 0.55, delay: 0.85, growth: 0, bloom: 0, height: 180, colors: { center: '#002244', mid: '#2266aa', edge: '#66bbff', highlight: 'rgba(150,200,255,0.8)' }, stem: '#22bb22', leaves: [{t: 0.6, d: -1}] },
+            { x: -300, scale: 0.65, delay: 0.75, growth: 0, bloom: 0, height: 220, colors: { center: '#441111', mid: '#cc4444', edge: '#ff8888', highlight: 'rgba(255,150,150,0.7)' }, stem: '#44dd44', leaves: [{t: 0.4, d: 1}] },
+            { x: -250, scale: 0.6, delay: 0.8, growth: 0, bloom: 0, height: 200, colors: { center: '#330033', mid: '#8800cc', edge: '#dd88ff', highlight: 'rgba(230,150,255,0.7)' }, stem: '#229922', leaves: [{t: 0.4, d: -1}, {t: 0.7, d: 1}] }, 
+            { x: 230, scale: 0.7, delay: 0.6, growth: 0, bloom: 0, height: 250, colors: { center: '#441100', mid: '#ff6600', edge: '#ffcc00', highlight: 'rgba(255,220,100,0.7)' }, stem: '#55ee55', leaves: [{t: 0.5, d: 1}] }, 
+            { x: -180, scale: 0.9, delay: 0.4, growth: 0, bloom: 0, height: 320, colors: { center: '#440000', mid: '#ff1111', edge: '#ff6666', highlight: 'rgba(255,120,120,0.6)' }, stem: '#44cc44', leaves: [{t: 0.3, d: 1}, {t: 0.6, d: -1}] }, 
+            { x: 160, scale: 0.8, delay: 0.5, growth: 0, bloom: 0, height: 280, colors: { center: '#110033', mid: '#3300bb', edge: '#8844ff', highlight: 'rgba(150,100,255,0.8)' }, stem: '#33bb33', leaves: [{t: 0.4, d: -1}, {t: 0.8, d: 1}] }, 
+            // Capa Media
+            { x: 0, scale: 0.95, delay: 0.45, growth: 0, bloom: 0, height: 300, colors: { center: '#003322', mid: '#00aa88', edge: '#55ffdd', highlight: 'rgba(150,255,220,0.7)' }, stem: '#22aa22', leaves: [{t: 0.4, d: -1}, {t: 0.7, d: 1}] },
+            { x: -90, scale: 1.2, delay: 0.2, growth: 0, bloom: 0, height: 400, colors: { center: '#332211', mid: '#ffffff', edge: '#cccccc', highlight: 'rgba(255,255,255,0.9)' }, stem: '#44ee44', leaves: [{t: 0.2, d: -1}, {t: 0.5, d: 1}, {t: 0.8, d: -1}] }, 
+            { x: 100, scale: 1.1, delay: 0.3, growth: 0, bloom: 0, height: 380, colors: { center: '#330011', mid: '#dd0055', edge: '#ff66aa', highlight: 'rgba(255,150,200,0.7)' }, stem: '#33dd33', leaves: [{t: 0.3, d: 1}, {t: 0.7, d: -1}] }, 
+            { x: -140, scale: 1.0, delay: 0.35, growth: 0, bloom: 0, height: 350, colors: { center: '#442222', mid: '#ffaa88', edge: '#ffeedd', highlight: 'rgba(255,240,230,0.8)' }, stem: '#55ff55', leaves: [{t: 0.4, d: 1}, {t: 0.8, d: -1}] },
+            { x: 80, scale: 0.85, delay: 0.65, growth: 0, bloom: 0, height: 260, colors: { center: '#440022', mid: '#bb1166', edge: '#ff5599', highlight: 'rgba(255,120,180,0.6)' }, stem: '#22cc22', leaves: [{t: 0.5, d: -1}] },
+            // Capa Frontal
+            { x: -40, scale: 1.5, delay: 0.0, growth: 0, bloom: 0, height: 500, colors: { center: '#220000', mid: '#bb0000', edge: '#ff2222', highlight: 'rgba(255,80,80,0.7)' }, stem: '#44ff44', leaves: [{t: 0.2, d: 1}, {t: 0.4, d: -1}, {t: 0.7, d: 1}] }, 
+            { x: 40, scale: 1.4, delay: 0.1, growth: 0, bloom: 0, height: 460, colors: { center: '#333300', mid: '#ffee00', edge: '#ffff88', highlight: 'rgba(255,255,180,0.8)' }, stem: '#55ff55', leaves: [{t: 0.25, d: -1}, {t: 0.6, d: 1}] }
+        ];
+
+        // Inicializamos los pétalos asimétricos para CADA lirio
+        lilies.forEach(lily => {
+            lily.petals = [];
+            for(let i=0; i<6; i++) {
+                lily.petals.push({
+                    angleOffset: (Math.random() - 0.5) * 0.4, // Variación de ángulo
+                    lengthMod: 0.8 + Math.random() * 0.4,     // Variación de largo (80% a 120%)
+                    widthMod: 0.7 + Math.random() * 0.6,      // Variación de grosor (70% a 130%)
+                    asym: (Math.random() - 0.5) * 25          // Curva asimétrica aleatoria
+                });
+            }
+        });
+
+        // PASTO OSCURO
+        const grasses = [];
+        for(let i=0; i<800; i++) {
+            grasses.push({
+                x: (Math.random() - 0.5) * window.innerWidth * 3, 
+                height: 40 + Math.random() * 90, 
+                curve: (Math.random() - 0.5) * 60,
+                delay: Math.random() * 0.5,
+                color: ['#041504', '#062206', '#083008', '#0a3d0a', '#061a06'][Math.floor(Math.random()*5)]
+            });
+        }
+
+        function drawSolidLiliesMasked() {
+            if (!startFlowers) return; 
+
+            fctx.clearRect(0, 0, flowerCanvas.width, flowerCanvas.height);
+            const cx = flowerCanvas.width / 2;
+            const cy = flowerCanvas.height; 
+
+            fctx.globalCompositeOperation = 'source-over';
+            
+            // 1. Pasto
+            if (globalFlowerProgress < 1) globalFlowerProgress += 0.002;
+            let windTime = Date.now() * 0.0015;
+
+            fctx.lineWidth = 4;
+            fctx.lineCap = 'round';
+            grasses.forEach(g => {
+                let gGrowth = Math.max(0, Math.min(1, (globalFlowerProgress - g.delay) * 3));
+                if (gGrowth === 0) return;
+                
+                let currentH = g.height * gGrowth;
+                let grassSway = Math.sin(windTime + g.x * 0.01) * 20; 
+
+                fctx.strokeStyle = g.color;
+                fctx.beginPath();
+                fctx.moveTo(cx + g.x, cy);
+                fctx.quadraticCurveTo(cx + g.x + (g.curve/2) + grassSway/2, cy - (currentH/2), cx + g.x + g.curve + grassSway, cy - currentH);
+                fctx.stroke();
+            });
+
+            // 2. Flores Realistas (Capullo a Flor Asimétrica)
+            lilies.forEach(lily => {
+                if (lily.growth < 1) {
+                    lily.growth += 0.0025; 
+                } else if (lily.bloom < 1) {
+                    lily.bloom += 0.005; 
+                }
+                
+                let localGrowth = Math.max(0, Math.min(1, (lily.growth - lily.delay) * 2));
+                if(localGrowth === 0) return;
+                
+                let sway = localGrowth >= 1 ? Math.sin(Date.now() * 0.0003 + lily.delay) * 0.04 : 0;
+                let stemHeight = lily.height * localGrowth;
+                
+                fctx.save();
+                fctx.translate(cx, cy);
+                fctx.rotate(sway); 
+                
+                fctx.lineWidth = 10;
+                fctx.strokeStyle = lily.stem;
+                fctx.beginPath();
+                fctx.moveTo(0, 0);
+                fctx.quadraticCurveTo(lily.x * 0.3, -stemHeight * 0.5, lily.x, -stemHeight);
+                fctx.stroke();
+
+                lily.leaves.forEach(leaf => {
+                    if (localGrowth > leaf.t) {
+                        let leafGrowth = Math.min(1, (localGrowth - leaf.t) / 0.3);
+                        let leafX = lily.x * leaf.t;
+                        let leafY = -lily.height * leaf.t;
+
+                        fctx.save();
+                        fctx.translate(leafX, leafY);
+                        fctx.scale(leafGrowth * lily.scale, leafGrowth * lily.scale);
+                        fctx.beginPath();
+                        fctx.moveTo(0, 0);
+                        fctx.quadraticCurveTo(leaf.d * 40, -10, leaf.d * 60, -40);
+                        fctx.quadraticCurveTo(leaf.d * 20, -40, 0, 0);
+                        fctx.fillStyle = lily.stem; 
+                        fctx.fill();
+                        fctx.restore();
+                    }
+                });
+
+                if (localGrowth > 0.7) {
+                    let headGrowth = (localGrowth - 0.7) / 0.3; 
+                    let b = lily.bloom; // 0 = Capullo cerrado, 1 = Flor abierta
+
+                    fctx.translate(lily.x, -stemHeight);
+                    fctx.scale(lily.scale * headGrowth, lily.scale * headGrowth);
+                    
+                    for(let i=0; i<6; i++) {
+                        fctx.save();
+                        let pt = lily.petals[i];
+                        
+                        // LÓGICA DE CAPULLO: Todos apuntan estrictamente hacia arriba (Math.PI)
+                        let closedAngle = Math.PI; 
+                        // Ángulo final asimétrico
+                        let finalAngle = (Math.PI * 2 / 6) * i + pt.angleOffset;
+                        
+                        // Camino más corto para que abran limpiamente
+                        let diff = finalAngle - closedAngle;
+                        while(diff > Math.PI) diff -= Math.PI * 2;
+                        while(diff < -Math.PI) diff += Math.PI * 2;
+                        
+                        // Inician al 5% separados para no empalmarse feo, y abren hasta el 100%
+                        let currentAngle = closedAngle + diff * (0.05 + 0.95 * b);
+                        fctx.rotate(currentAngle);
+                        
+                        // Los pétalos del capullo son muy delgados (0.15), luego se ensanchan
+                        let petalWidthScale = 0.15 + (0.85 * pt.widthMod) * b;
+                        fctx.scale(petalWidthScale, pt.lengthMod);
+
+                        let grad = fctx.createLinearGradient(0, 0, 0, 110);
+                        grad.addColorStop(0, lily.colors.center);
+                        grad.addColorStop(0.5, lily.colors.mid);
+                        grad.addColorStop(1, lily.colors.edge);
+                        
+                        fctx.beginPath();
+                        fctx.moveTo(0, 0);
+                        // Curvatura asimétrica aplicada
+                        fctx.bezierCurveTo(35 + pt.asym, 40, 15 + pt.asym/2, 90, 0, 110);
+                        fctx.bezierCurveTo(-15 + pt.asym/2, 90, -35 + pt.asym, 40, 0, 0);
+                        fctx.fillStyle = grad;
+                        fctx.fill();
+                        
+                        fctx.beginPath();
+                        fctx.moveTo(0, 15);
+                        fctx.quadraticCurveTo(pt.asym * 0.3, 60, 0, 95);
+                        fctx.strokeStyle = lily.colors.highlight;
+                        fctx.lineWidth = 2;
+                        fctx.stroke();
+                        fctx.restore();
+                    }
+                    
+                    // Polen oculto hasta que se abre
+                    fctx.globalAlpha = b;
+                    fctx.fillStyle = '#ffaa00';
+                    fctx.beginPath(); fctx.arc(0, 0, 8, 0, Math.PI*2); fctx.fill();
+                    fctx.fillStyle = '#ffcc00';
+                    fctx.beginPath(); fctx.arc(0, 0, 4, 0, Math.PI*2); fctx.fill();
+                    fctx.globalAlpha = 1.0;
+                }
+                fctx.restore();
+            });
+
+            fctx.globalCompositeOperation = 'destination-in';
+            fctx.drawImage(maskCanvas, 0, 0);
+
+            ctx.drawImage(flowerCanvas, 0, 0);
+        }
+
+        function startExperience() {
+            errorBox.style.display = 'none';
+            music.play();
+            isClimax = true;
+            
+            setTimeout(() => {
+                texts.push(new LoveMeVolumetric(true));
+                spawnCount++;
+                
+                setInterval(() => {
+                    if (spawnCount < 15) {
+                        texts.push(new LoveMeVolumetric(false));
+                        spawnCount++;
+                    }
+                }, 3000); 
+            }, 1000);
+
+            loopClimax();
+        }
+
+        function loopClimax() {
+            if (!isClimax) return;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Luciérnagas
+            ctx.font = "16px monospace";
+            ctx.textAlign = "center";
+            fireflies.forEach(p => {
+                let currentOpacity = 0.5 + Math.sin(Date.now() * p.blinkSpeed + p.phase) * 0.5;
+                if (currentOpacity < 0) currentOpacity = 0;
+                
+                ctx.fillStyle = `rgba(255, 255, 200, ${currentOpacity})`;
+                ctx.fillText(p.char, p.x, p.y);
+                p.x -= p.speed;
+                if(p.x < -20) p.x = window.innerWidth + 20;
+            });
+
+            // Textos Volumétricos
+            texts.forEach(t => t.draw());
+
+            // Partículas cayendo libres
+            ctx.font = "bold 14px monospace";
+            ctx.textAlign = "center";
+            
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.history.push({x: p.x, y: p.y});
+                if (p.history.length > 10) p.history.shift();
+
+                if (p.history.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.history[0].x, p.history[0].y);
+                    for (let h = 1; h < p.history.length; h++) {
+                        ctx.lineTo(p.history[h].x, p.history[h].y);
+                    }
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = p.color;
+                ctx.fillText(p.char, p.x, p.y);
+                
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.03; 
+                
+                if (p.y > canvas.height + 50) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            drawSolidLiliesMasked();
+
+            requestAnimationFrame(loopClimax);
+        }
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            flowerCanvas.width = window.innerWidth;
+            flowerCanvas.height = window.innerHeight;
+            generateOrganicMask(); 
+        });
+    </script>
+</body>
+</html>
